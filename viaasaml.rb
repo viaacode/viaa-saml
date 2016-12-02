@@ -8,12 +8,37 @@ class ViaaSaml < Sinatra::Base
     use Rack::Session::Pool, expire_after: 900
 
     configure do
-        set :protection, except: [:remote_token,:session_hijacking,:frame_options]
+        # designed to run as middleware, protection is set in config.ru
+        # if rack protection is used, the the layers RemoteToken,
+        # SessionHijacking and HttpOrigin must be skipped
+        # to allow the saml protocol to function
+        disable :protection
+
+        # viaa-saml settings
         saml_auth = YAML.load_file(CONFIGFILE)['saml_auth']  || {}
-        set :app_id, saml_auth['app_id']
         exclude = Array saml_auth['exclude']
-        set :exclude, exclude&.map { |x| Regexp.new "^#{x}" }
+        set :app_id, saml_auth['app_id']
+        set :exclude, exclude&.map { |x| Regexp.new x }
+
+        # ruby-saml settings
         OneLogin::RubySaml::Attributes.single_value_compatibility = false
+        samlsettings = OneLogin::RubySaml::Settings.new
+        YAML.load_file(CONFIGFILE)['saml_metadata'].each do |k,v|
+            v.each { |k,v| samlsettings.send "#{k}=", v }
+        end
+        samlsettings.soft = true
+        samlsettings.assertion_consumer_service_binding =
+            "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+        samlsettings.assertion_consumer_logout_service_binding =
+            "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+        samlsettings.security[:authn_requests_signed]   = true
+        samlsettings.security[:logout_requests_signed]  = true
+        samlsettings.security[:logout_responses_signed] = true
+        samlsettings.security[:metadata_signed]         = true
+        samlsettings.security[:digest_method] = XMLSecurity::Document::SHA1
+        samlsettings.security[:signature_method] = XMLSecurity::Document::RSA_SHA256
+        set :samlsettings, samlsettings
+        set :idp_url, OneLogin::RubySaml::Authrequest.new.create(samlsettings)
     end
 
     helpers do
@@ -55,25 +80,19 @@ class ViaaSaml < Sinatra::Base
 
         def saml_single_logout!
             logout_request = OneLogin::RubySaml::SloLogoutrequest.
-                new(params[:SAMLRequest], settings: saml_settings)
+                new(params[:SAMLRequest], settings: settings.samlsettings)
             badrequest! 'invalid slo request' unless logout_request.is_valid?
             delete_session
             logout_response = OneLogin::RubySaml::SloLogoutresponse.new
             redirect logout_response.
-                create(saml_settings, logout_request.id, nil,
+                create(settings.samlsettings, logout_request.id, nil,
                        RelayState: params[:RelayState])
         end
 
-        def to_idp!
-            auth_url = OneLogin::RubySaml::Authrequest.new.
-                create(saml_settings)
-            redirect(auth_url)
-        end
-
         def saml_authenticate!
-            to_idp! unless params[:SAMLResponse]
+            redirect settings.idp_url unless params[:SAMLResponse]
             @samlresponse = OneLogin::RubySaml::Response.
-                new(params[:SAMLResponse], settings: saml_settings)
+                new(params[:SAMLResponse], settings: settings.samlsettings)
             validate_response!
             saml_authorize!
             set_attributes
@@ -83,7 +102,7 @@ class ViaaSaml < Sinatra::Base
 
         def saml_logged_out!
             response = OneLogin::RubySaml::Logoutresponse.
-                new(params[:SAMLResponse], saml_settings)
+                new(params[:SAMLResponse], settings.samlsettings)
             return unless response.validate
             delete_session
             redirect '/saml/loggedout'
@@ -93,27 +112,7 @@ class ViaaSaml < Sinatra::Base
             saml_single_logout! if params[:SAMLRequest]
             saml_logged_out! if params[:SAMLResponse]
             logout_request = OneLogin::RubySaml::Logoutrequest.new
-            redirect logout_request.create(saml_settings)
-        end
-
-        def saml_settings
-            return @settings if @settings
-            settings = OneLogin::RubySaml::Settings.new
-            YAML.load_file(CONFIGFILE)['saml_metadata'].each do |k,v|
-                v.each { |k,v| settings.send "#{k}=", v }
-            end
-            settings.soft = true
-            settings.assertion_consumer_service_binding =
-                "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
-            settings.assertion_consumer_logout_service_binding =
-                "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
-            settings.security[:authn_requests_signed]   = true
-            settings.security[:logout_requests_signed]  = true
-            settings.security[:logout_responses_signed] = true
-            settings.security[:metadata_signed]         = true
-            settings.security[:digest_method] = XMLSecurity::Document::SHA1
-            settings.security[:signature_method] = XMLSecurity::Document::RSA_SHA256
-            @settings = settings
+            redirect logout_request.create(settings.samlsettings)
         end
 
     end

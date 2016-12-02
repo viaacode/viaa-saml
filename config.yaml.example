@@ -2,7 +2,7 @@
 saml_auth: 
   app_id: mediahaven
   exclude: 
-    - /public/
+    - ^/public/
 saml_metadata:
   sp:
     issuer: http://www.example.org/sp

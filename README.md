@@ -7,6 +7,9 @@ Typically deployed via config.ru, for example:
 require_relative 'my_awesome_app'
 require_relative 'lib/viaasaml'
 
+use Rack::Protection, except: [:remote_token,:session_hijacking,:http_origin]
 use ViaaSaml
+
+use Rack::Protection
 run MyAwesomeApp
 ```
