@@ -9,8 +9,8 @@ class ViaaSaml < Sinatra::Base
 
     configure do
         # designed to run as middleware, protection is set in config.ru
-        # if rack protection is used, the the layers RemoteToken,
-        # SessionHijacking and HttpOrigin must be skipped
+        # if rack protection is used, the layers RemoteToken,
+        # SessionHijacking and HttpOrigin must be skipped in order
         # to allow the saml protocol to function
         disable :protection
 
@@ -70,12 +70,20 @@ class ViaaSaml < Sinatra::Base
             session.delete(:user)
         end
 
+        def to_idp!
+            session[:orig_url] = url request.path
+            redirect settings.idp_url
+        end
+
+        def to_app!
+            redirect session.delete(:orig_url) if session[:orig_url]
+        end
+
         # a user is authorized for using this app when and only when
         # the app_id is listed in the :apps attribute of the saml ticket
         def saml_authorize!
             unauthorized! "no access for app_id #{settings.app_id}" unless
-                @samlresponse.attributes[:apps] &&
-                @samlresponse.attributes[:apps].include?(settings.app_id)
+                @samlresponse.attributes[:apps]&.include?(settings.app_id)
         end
 
         def saml_single_logout!
@@ -90,14 +98,14 @@ class ViaaSaml < Sinatra::Base
         end
 
         def saml_authenticate!
-            redirect settings.idp_url unless params[:SAMLResponse]
+            to_idp! unless params[:SAMLResponse]
             @samlresponse = OneLogin::RubySaml::Response.
                 new(params[:SAMLResponse], settings: settings.samlsettings)
             validate_response!
             saml_authorize!
             set_attributes
             session[:user] = @samlresponse.nameid
-            redirect session.delete(:orig_url) if session[:orig_url]
+            to_app!
         end
 
         def saml_logged_out!
@@ -141,7 +149,6 @@ class ViaaSaml < Sinatra::Base
     # but authenticate first if needed
     get '/*' do
         pass if session[:user] || excluded?
-        session[:orig_url] = url request.path
         saml_authenticate!
     end
 
