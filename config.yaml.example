@@ -1,6 +1,7 @@
 ---
 saml_auth: 
   app_id: mediahaven
+  org_id: OR-sample
   exclude: 
     - ^/public/
 saml_metadata:

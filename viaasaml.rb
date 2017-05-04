@@ -12,6 +12,7 @@ class ViaaSaml
         saml_auth = YAML.load_file(configfile)['saml_auth']  || {}
         exclude = Array saml_auth['exclude']
         @app_id = saml_auth['app_id']
+        @org_id = saml_auth['org_id']
         @exclude = exclude&.map { |x| Regexp.new x }
 
         # ruby-saml settings
@@ -52,7 +53,7 @@ class ViaaSaml
         redirect idp_url
     end
 
-    def redirect_to_app
+    def back_to_app
         redirect session.delete(:orig_url)
     end
 
@@ -86,17 +87,22 @@ class ViaaSaml
         samlresponse = OneLogin::RubySaml::Response.
             new(params['SAMLResponse'], settings: @samlsettings)
 
-        return unauthorized 'invalid SAML response' unless
-        samlresponse.is_valid?
+        return unauthorized 'invalid SAML response' unless samlresponse.is_valid?
 
         # a user is authorized for using this app when and only when
         # the app_id is listed in the :apps attribute of the saml ticket
-        return unauthorized "no access for app_id #{@app_id}" unless
-        samlresponse.attributes.multi(:apps)&.include?(@app_id)
+        return unauthorized "unauthorized for this app" if @app_id &&
+            !samlresponse.attributes.multi(:apps)&.include?(@app_id)
 
+        # a user is authorized for using this app when and only when
+        # the user is member of an organisation in @org_id
+        return unauthorized "unauthorized organisation" if @org_id &&
+            !@org_id.include?(samlresponse.attributes[:o])
+
+        # Login successfull, setup session
         session[:attributes] = Hash[samlresponse.attributes.all]
         session[:user] = samlresponse.nameid
-        redirect_to_app
+        back_to_app
     end
 
     # SLO request from idP: terminate the session and send an SLO response
