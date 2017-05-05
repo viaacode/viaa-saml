@@ -3,21 +3,15 @@ require 'yaml'
 
 class ViaaSaml
 
-    def initialize(app, options={})
+    def initialize(app, options)
         @app = app
-        configfile = options[:configfile] ||
-            File.expand_path('../config.yaml/',__FILE__)
-
-        # viaa-saml settings
-        saml_auth = YAML.load_file(configfile)['saml_auth']  || {}
-        exclude = Array saml_auth['exclude']
-        @app_id = saml_auth['app_id']
-        @org_id = saml_auth['org_id']
+        @app_id = options[:saml_app_id]
+        @org_id = options[:saml_org_id]
+        exclude = Array options[:saml_exclude]
         @exclude = exclude&.map { |x| Regexp.new x }
 
-        # ruby-saml settings
         samlsettings = OneLogin::RubySaml::Settings.new
-        YAML.load_file(configfile)['saml_metadata'].each do |k,v|
+        options[:saml_metadata].each do |k,v|
              samlsettings.send "#{k}=", v
         end
         samlsettings.soft = true

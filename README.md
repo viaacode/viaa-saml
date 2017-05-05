@@ -15,9 +15,11 @@ require_relative 'my_awesome_app'
 require_relative 'lib/viaasaml'
 require 'rack/protection'
 
+options = YAML.load_file File.expand_path('./config.yaml', File.dirname(__FILE__))
+
 use Rack::Protection, except: [:remote_token,:session_hijacking,:http_origin]
 use Rack::Session::Pool, expire_after: 1200
-use ViaaSaml, configfile: '/path/to/configfile'
+use ViaaSaml, options
 
 use Rack::Protection
 run MyAwesomeApp

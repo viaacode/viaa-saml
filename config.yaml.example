@@ -1,27 +1,26 @@
 ---
-saml_auth: 
-  app_id: mediahaven
-  org_id: OR-sample
-  exclude: 
+:saml_app_id: mediahaven
+:saml_org_id: OR-sample
+:saml_exclude:
     - ^/public/
-saml_metadata:
-  issuer: http://www.example.org/sp
-  assertion_consumer_service_url: https://www.example.org/saml/login
-  assertion_consumer_logout_service_url: https://www.example.org/saml/logout
-  certificate: |
-    -----BEGIN CERTIFICATE-----
-    MIICSDC...
-    ...
-    nT37znqAy...
-    -----END CERTIFICATE-----
-  private_key: |
-    -----BEGIN RSA PRIVATE KEY-----
-    MIICXw...
-    ...
-    B994qv...
-    -----END RSA PRIVATE KEY-----
-  idp_entity_id: http://idp.example.com/idp
-  idp_sso_target_url: https://idp.example.com/idp/SSOService.php
-  idp_slo_target_url: https://idp.example.com/idp/SingleLogoutService.php
-  idp_cert_fingerprint: '28:26:A5:F4:9A:AF:23:AG:45:DF:32:60:F3:A5:3G:11:22:BB:34:D3'
-  idp_cert_fingerprint_algorithm: http://www.w3.org/2000/09/xmldsig#sha1
+:saml_metadata:
+    issuer: http://www.example.org/sp
+    assertion_consumer_service_url: https://www.example.org/saml/login
+    assertion_consumer_logout_service_url: https://www.example.org/saml/logout
+    certificate: |
+        -----BEGIN CERTIFICATE-----
+        MIICSDC...
+        ...
+        nT37znqAy...
+        -----END CERTIFICATE-----
+    private_key: |
+        -----BEGIN RSA PRIVATE KEY-----
+        MIICXw...
+        ...
+        B994qv...
+        -----END RSA PRIVATE KEY-----
+    idp_entity_id: http://idp.example.com/idp
+    idp_sso_target_url: https://idp.example.com/idp/SSOService.php
+    idp_slo_target_url: https://idp.example.com/idp/SingleLogoutService.php
+    idp_cert_fingerprint: '28:26:A5:F4:9A:AF:23:AG:45:DF:32:60:F3:A5:3G:11:22:BB:34:D3'
+    idp_cert_fingerprint_algorithm: http://www.w3.org/2000/09/xmldsig#sha1
