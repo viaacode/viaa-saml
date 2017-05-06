@@ -1,3 +1,4 @@
+require 'rack'
 require 'ruby-saml'
 require 'yaml'
 
