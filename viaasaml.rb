@@ -1,10 +1,9 @@
-require 'rack'
 require 'ruby-saml'
 require 'yaml'
 
 class ViaaSaml
 
-    def initialize(app, options)
+    def initialize app, options
         @app = app
         @app_id = options[:saml_app_id]
         @org_id = options[:saml_org_id]
@@ -52,26 +51,24 @@ class ViaaSaml
         redirect session.delete(:orig_url)
     end
 
-    def badrequest(reason)
+    def badrequest reason
         halt 400, reason
     end
 
-    def unauthorized(reason)
+    def unauthorized reason
         delete_session
         halt 401, reason
     end
 
-    def redirect(url)
+    def redirect url
         response = Rack::Response.new
         response.redirect url
         response.finish
     end
 
-    def halt(code,reason)
+    def halt code,reason
         delete_session
-        response = Rack::Response.new
-        response.status = code
-        response.body = [reason]
+        response = Rack::Response.new [reason], code
         response.finish
     end
 
@@ -133,7 +130,7 @@ class ViaaSaml
         # no SAML param: logout request from the user
         settings = @samlsettings.dup
         settings.name_identifier_value = session[:user]
-        logout_request = OneLogin::RubySaml::Logoutrequest.new.create(settings)
+        logout_request = OneLogin::RubySaml::Logoutrequest.new.create settings
         redirect logout_request
     end
 
@@ -162,11 +159,10 @@ class ViaaSaml
 
         return app_session if saml_login_callback?
         return saml_logout if saml_logout_callback?
-
-        return @app.call env if authenticated? || excluded?
-
         # authenticate the user
-        redirect_to_idp
+        return redirect_to_idp unless authenticated? || excluded?
+
+        @app.call env
     end
 
 end
