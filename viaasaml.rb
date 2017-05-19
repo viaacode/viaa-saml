@@ -4,19 +4,11 @@ require 'yaml'
 
 class ViaaSaml
 
-    class SamlRequest
+    class SamlRequest < Rack::Request
 
         # class instance variables
         class << self
             attr_accessor :samlsettings, :org_id, :app_id
-        end
-
-        def initialize env
-            request = Rack::Request.new env
-            @samlsettings = self.class.samlsettings
-            @params = request.params
-            @session = request.session
-            @url = request.url
         end
 
         def authenticate!
@@ -30,23 +22,27 @@ class ViaaSaml
 
         private
 
+        def samlsettings
+            self.class.samlsettings
+        end
+
         def authenticated?
-            !@session[:user].nil?
+            !self.session[:user].nil?
         end
 
         def delete_session
-            @session.delete(:user)
-            @session.delete(:attributes)
+            self.session.delete(:user)
+            self.session.delete(:attributes)
         end
 
         def redirect_to_idp
-            idp_url = OneLogin::RubySaml::Authrequest.new.create(@samlsettings)
-            @session[:orig_url] = @url
+            idp_url = OneLogin::RubySaml::Authrequest.new.create(samlsettings)
+            self.session[:orig_url] = self.url
             redirect idp_url
         end
 
         def back_to_app
-            redirect @session.delete(:orig_url)
+            redirect self.session.delete(:orig_url)
         end
 
         def badrequest reason
@@ -71,10 +67,10 @@ class ViaaSaml
 
         def app_session
             return badrequest 'missing SAMLresponse' unless
-            @params['SAMLResponse']
+            self.params['SAMLResponse']
 
             samlresponse = OneLogin::RubySaml::Response.
-                new(@params['SAMLResponse'], settings: @samlsettings)
+                new(self.params['SAMLResponse'], settings: samlsettings)
 
             return unauthorized 'invalid SAML response' unless samlresponse.is_valid?
 
@@ -91,21 +87,21 @@ class ViaaSaml
                 !org_id.include?(samlresponse.attributes[:o])
 
             # Login successfull, setup session
-            @session[:attributes] = Hash[samlresponse.attributes.all]
-            @session[:user] = samlresponse.nameid
+            self.session[:attributes] = Hash[samlresponse.attributes.all]
+            self.session[:user] = samlresponse.nameid
             back_to_app
         end
 
         # SLO request from idP: terminate the session and send an SLO response
         def saml_slo_response
             logout_request = OneLogin::RubySaml::SloLogoutrequest.
-                new(@params['SAMLRequest'], settings: @samlsettings)
+                new(self.params['SAMLRequest'], settings: samlsettings)
 
             return badrequest 'invalid SAML slo request' unless logout_request.is_valid?
 
             delete_session
             logout_response = OneLogin::RubySaml::SloLogoutresponse.new.create(
-                @samlsettings, logout_request.id, nil, RelayState: @params['RelayState']
+                samlsettings, logout_request.id, nil, RelayState: self.params['RelayState']
             )
             redirect logout_response
         end
@@ -113,7 +109,7 @@ class ViaaSaml
         # Logout response from idP: terminate the session
         def terminate_session
             response = OneLogin::RubySaml::Logoutresponse.
-                new(@params['SAMLResponse'], @samlsettings)
+                new(self.params['SAMLResponse'], samlsettings)
             return badrequest, 'invalid SAML response' unless response.validate
             # halts deletes the session
             halt 200, 'Logged out, session ended'
@@ -121,24 +117,24 @@ class ViaaSaml
 
         def logout
             # SLO request from idP
-            return saml_slo_response if @params['SAMLRequest']
+            return saml_slo_response if self.params['SAMLRequest']
 
             # Logout response from idP
-            return terminate_session if @params['SAMLResponse']
+            return terminate_session if self.params['SAMLResponse']
 
             # no SAML param: logout request from the user
-            settings = @samlsettings.dup
-            settings.name_identifier_value = @session[:user]
+            settings = samlsettings.dup
+            settings.name_identifier_value = self.session[:user]
             logout_request = OneLogin::RubySaml::Logoutrequest.new.create settings
             redirect logout_request
         end
 
         def logout_callback?
-            @url == @samlsettings.assertion_consumer_logout_service_url
+            self.url == samlsettings.assertion_consumer_logout_service_url
         end
 
         def login_callback?
-            @url == @samlsettings.assertion_consumer_service_url
+            self.url == samlsettings.assertion_consumer_service_url
         end
 
     end
