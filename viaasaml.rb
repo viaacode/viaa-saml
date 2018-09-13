@@ -141,13 +141,13 @@ class ViaaSaml
 
     def initialize app, options
         @app = app
-        SamlRequest.app_id = options[:saml_app_id]
-        SamlRequest.org_id = options[:saml_org_id]
-        exclude = Array options[:saml_exclude]
+        SamlRequest.app_id = options['saml_app_id']
+        SamlRequest.org_id = options['saml_org_id']
+        exclude = Array options['saml_exclude']
         @excluded = exclude&.map { |x| Regexp.new x }
 
         samlsettings = OneLogin::RubySaml::Settings.new
-        options[:saml_metadata].each do |k,v|
+        options['saml_metadata'].each do |k,v|
             samlsettings.send "#{k}=", v
         end
         samlsettings.soft = true
