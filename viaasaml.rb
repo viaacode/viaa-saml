@@ -143,8 +143,6 @@ class ViaaSaml
         @app = app
         SamlRequest.app_id = options['saml_app_id']
         SamlRequest.org_id = options['saml_org_id']
-        exclude = Array options['saml_exclude']
-        @excluded = exclude&.map { |x| Regexp.new x }
 
         samlsettings = OneLogin::RubySaml::Settings.new
         options['saml_metadata'].each do |k,v|
@@ -168,7 +166,7 @@ class ViaaSaml
     end
 
     def call env
-        unless @excluded.any? { |x| x =~ env['PATH_INFO'] }
+        unless @app.respond_to?(:public?) && @app.public?(env['PATH_INFO'])
             request = SamlRequest.new env
             samlresponse = request.authenticate!
             # Play the SAML game until we have a valid SAML session
