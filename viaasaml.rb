@@ -142,11 +142,11 @@ class ViaaSaml
 
     def initialize app, options
         @app = app
-        SamlRequest.app_id = options['saml_app_id']
-        SamlRequest.org_id = options['saml_org_id']
-
+        SamlRequest.app_id = options[:saml_app_id]
+        SamlRequest.org_id = options[:saml_org_id]
+        idp_metadata_url = options[:idp_metadata_url]
         idp_metadata_parser = OneLogin::RubySaml::IdpMetadataParser.new
-        samlsettings = idp_metadata_parser.parse_remote('https://idp-qas.viaa.be/saml2/idp/metadata.php?output=xml')
+        samlsettings = idp_metadata_parser.parse_remote(idp_metadata_url)
         samlsettings.soft = true
         samlsettings.assertion_consumer_service_binding =
             "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
